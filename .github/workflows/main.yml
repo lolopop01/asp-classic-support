@@ -1,17 +1,40 @@
+name: Build VSIX
+
 on:
   push:
     tags:
-      - v*
-name: Deploy Extension
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    environment: Default
+  build:
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v2
-      - run: npm install
-      - uses: lannonbr/vsce-action@3.0.0
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
         with:
-          args: "publish -p $VSCE_TOKEN"
-        env:
-          VSCE_TOKEN: ${{ secrets.VSCE_PAT }}
+          node-version: 24
+
+      - name: Install dependencies
+        run: |
+          npm install -g yarn
+          yarn install --frozen-lockfile || yarn install
+
+      - name: Package extension
+        run: npx --yes @vscode/vsce package --no-yarn -o asp-classic-support.vsix
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: asp-classic-support-vsix
+          path: asp-classic-support.vsix
+
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v3
+        with:
+          files: asp-classic-support.vsix
